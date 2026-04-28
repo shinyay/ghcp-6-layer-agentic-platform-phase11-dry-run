@@ -1,0 +1,1253 @@
+name: L2 Step Gate Test (Step 0 / Step 1 / Step 2 / Step 3 / Step 4 / Step 5 / Step 6)
+
+# Phase 03 — Step 0 教材化に伴う L2 Step Gate Test 初実装。
+# Phase 04 で Step 1 (Memory) job を追加。
+# test-plan-template §1 の L2 (Step Gate) を、Step 0 という最小スコープから
+# 立ち上げる。Phase 04 以降の Step 1-6 では同 workflow に job を追加していく。
+#
+# Runner choice (Phase 11 で R03-7 解消 = ubuntu-latest 化済):
+#   - GitHub-hosted ubuntu-latest (= 計 7 step-N-gate jobs)。learner forks
+#     でも同 workflow を実行可能。
+#   - 当初 (Phase 03) は private repo で GitHub-hosted runner が spending
+#     limit でブロックされ self-hosted ACI に暫定退避していたが、Phase 11
+#     で public 化 + ubuntu-latest 化で正式解消。
+#
+# Trigger paths は教材ファイル (`content/**`) と seed scripts (`scripts/**`)
+# 自身、および本 workflow に絞る。`.devcontainer/**` の変更は smoke.yml が
+# 受け持つので path を分ける。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'content/**'
+      - 'scripts/**'
+      - '.github/workflows/step-gate.yml'
+  pull_request:
+    paths:
+      - 'content/**'
+      - 'scripts/**'
+      - '.github/workflows/step-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: step-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  step-0-gate:
+    name: Step 0 — README structure / links / seed script / escape hatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # T-PHASE03-001: Step 0 README に必須 8 セクションが揃っているか
+      - name: T-001 README structure (8 required sections)
+        run: |
+          set -euo pipefail
+          f="content/step-0-setup/README.md"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          # 期待: 8 つの ## セクションヘッダ (順不同で OK だが番号付きで定義)
+          required=(
+            '^## 1\. 学習目標'
+            '^## 2\. 前提'
+            '^## 3\. 手順'
+            '^## 4\. 完了確認'
+            '^## 5\. 詰まったら'
+            '^## 6\. 次の Step'
+            '^## 7\. 参考'
+          )
+          missing=0
+          for re in "${required[@]}"; do
+            if ! grep -Eq "$re" "$f"; then
+              echo "::error::missing section matching: $re"
+              missing=$((missing+1))
+            fi
+          done
+          # バッジ行 (1 つ目の ## の前に Status badge があること)
+          if ! grep -Eq '!\[Status\]\(.*Status-published' "$f"; then
+            echo "::error::missing Status=published badge"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 0 README structure check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-001 PASS"
+
+      # T-PHASE03-002: 内部 link (相対パス) の死活
+      # 外部 URL は除外、`../` 系の相対 link のみチェック
+      - name: T-002 internal links resolve
+        run: |
+          set -euo pipefail
+          f="content/step-0-setup/README.md"
+          # markdown link `[text](path)` のうち、http(s) と # アンカーを除いた相対 path を抽出
+          mapfile -t links < <(
+            grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?:|#|mailto:)' \
+              | sed -E 's/#.*$//' \
+              | grep -vE '^$' \
+              | sort -u
+          )
+          base="$(dirname "$f")"
+          missing=0
+          for l in "${links[@]}"; do
+            target="${base}/${l}"
+            if [ ! -e "$target" ]; then
+              echo "::error::broken internal link: $l (resolved to $target)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-002 PASS (${#links[@]} links checked)"
+
+      # T-PHASE03-003: seed-issues.sh の syntax + (可能なら) shellcheck
+      - name: T-003 seed-issues.sh syntax
+        run: |
+          set -euo pipefail
+          f="scripts/seed-issues.sh"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          bash -n "$f"
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck "$f"
+            echo "✅ T-003 PASS (bash -n + shellcheck)"
+          else
+            echo "::warning::shellcheck not installed, ran bash -n only"
+            echo "✅ T-003 PASS (bash -n only)"
+          fi
+
+      # T-PHASE03-004: escape hatch branch step-0-complete が origin に存在
+      - name: T-004 escape hatch branch exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin step-0-complete | grep -q step-0-complete; then
+            echo "✅ T-004 PASS (step-0-complete branch found on origin)"
+          else
+            echo "::error::origin/step-0-complete branch not found"
+            exit 1
+          fi
+
+  step-1-gate:
+    name: Step 1 — README structure / links / done checklist / keywords / escape hatch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # T-PHASE04-101: Step 1 README に必須 8 セクション + §3.5 privacy が揃っているか
+      - name: T-101 README structure (8 required sections + §3.5)
+        run: |
+          set -euo pipefail
+          f="content/step-1-memory/README.md"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          required=(
+            '^## 1\. 学習目標'
+            '^## 2\. 前提'
+            '^## 3\. 手順'
+            '^## 4\. 完了確認'
+            '^## 5\. 詰まったら'
+            '^## 6\. 次の Step'
+            '^## 7\. 参考'
+            '^### 3\.5'
+          )
+          missing=0
+          for re in "${required[@]}"; do
+            if ! grep -Eq "$re" "$f"; then
+              echo "::error::missing section matching: $re"
+              missing=$((missing+1))
+            fi
+          done
+          if ! grep -Eq '!\[Status\]\(.*Status-published' "$f"; then
+            echo "::error::missing Status=published badge"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 1 README structure check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-101 PASS (all required sections + §3.5 + Status badge present)"
+
+      # T-PHASE04-102: Step 1 README の内部 link 死活
+      - name: T-102 internal links resolve
+        run: |
+          set -euo pipefail
+          f="content/step-1-memory/README.md"
+          mapfile -t links < <(
+            grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?:|#|mailto:)' \
+              | sed -E 's/#.*$//' \
+              | grep -vE '^$' \
+              | sort -u
+          )
+          base="$(dirname "$f")"
+          missing=0
+          for l in "${links[@]}"; do
+            target="${base}/${l}"
+            if [ ! -e "$target" ]; then
+              echo "::error::broken internal link: $l (resolved to $target)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-102 PASS (${#links[@]} links checked)"
+
+      # T-PHASE04-103: Step 1 README の Done checklist が >= 4 項目
+      - name: T-103 done checklist >= 4 items
+        run: |
+          set -euo pipefail
+          f="content/step-1-memory/README.md"
+          n=$(grep -c '^- \[ \]' "$f" || true)
+          if [ "$n" -lt 4 ]; then
+            echo "::error::Done checklist has only $n items (need >= 4)"
+            exit 1
+          fi
+          echo "✅ T-103 PASS (Done checklist has $n items)"
+
+      # T-PHASE04-104: escape hatch branch step-1-complete が origin に存在
+      - name: T-104 escape hatch branch exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin step-1-complete | grep -q step-1-complete; then
+            echo "✅ T-104 PASS (step-1-complete branch found on origin)"
+          else
+            echo "::error::origin/step-1-complete branch not found"
+            exit 1
+          fi
+
+      # T-PHASE04-105: Step 1 固有文言 (D13)
+      # phase-04-step1-memory.md D13 で定めた Step 1 設計判断を CI で守る:
+      # - `Chat: Show Memory Files` (主導線コマンド、D7)
+      # - `Created memory file` または `Read memory` (Trust thread の核、E6 §3-§4)
+      # - F5 fallback 文言 (R04-9 個体差対策、D9)
+      - name: T-105 Step 1 design keywords present
+        run: |
+          set -euo pipefail
+          f="content/step-1-memory/README.md"
+          missing=0
+          # 必須 1: 主導線コマンド
+          grep -q 'Chat: Show Memory Files' "$f" || {
+            echo "::error::missing required keyword: Chat: Show Memory Files (D7 主導線)"
+            missing=$((missing+1))
+          }
+          # 必須 2: Trust thread トレース表記 (どちらか一方でも可)
+          if ! grep -q 'Created memory file' "$f" && ! grep -q 'Read memory' "$f"; then
+            echo "::error::missing required keyword: Created memory file or Read memory (Trust thread trace)"
+            missing=$((missing+1))
+          fi
+          # 必須 3: F5 fallback 文言
+          if ! grep -qE '提案が出ない|もし.*提案' "$f"; then
+            echo "::error::missing required keyword: F5 fallback (e.g. 提案が出ない)"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 1 design keyword check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-105 PASS (all Step 1 design keywords present)"
+
+  step-2-gate:
+    name: Step 2 — README structure / links / done checklist / keywords / escape hatch (Phase 05)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # T-PHASE05-201: Step 2 README に必須 8 セクション
+      - name: T-201 README structure (8 required sections)
+        run: |
+          set -euo pipefail
+          f="content/step-2-skill/README.md"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          required=(
+            '^## 1\. 学習目標'
+            '^## 2\. 前提'
+            '^## 3\. 手順'
+            '^## 4\. 完了確認'
+            '^## 5\. 詰まったら'
+            '^## 6\. 次の Step'
+            '^## 7\. 参考'
+          )
+          missing=0
+          for re in "${required[@]}"; do
+            if ! grep -Eq "$re" "$f"; then
+              echo "::error::missing section matching: $re"
+              missing=$((missing+1))
+            fi
+          done
+          if ! grep -Eq '必須 Step|必須 \(MUST' "$f"; then
+            echo "::error::missing Status badge / 必須 indicator"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 2 README structure check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-201 PASS (all required sections + Status badge present)"
+
+      # T-PHASE05-202: Step 2 README の内部 link 死活
+      - name: T-202 internal links resolve
+        run: |
+          set -euo pipefail
+          f="content/step-2-skill/README.md"
+          mapfile -t links < <(
+            grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?:|#|mailto:)' \
+              | sed -E 's/#.*$//' \
+              | grep -vE '^$' \
+              | sort -u
+          )
+          base="$(dirname "$f")"
+          missing=0
+          for l in "${links[@]}"; do
+            target="${base}/${l}"
+            if [ ! -e "$target" ]; then
+              echo "::error::broken internal link: $l (resolved to $target)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-202 PASS (${#links[@]} links checked)"
+
+      # T-PHASE05-203: Step 2 README の Done checklist が >= 4 項目
+      - name: T-203 done checklist >= 4 items
+        run: |
+          set -euo pipefail
+          f="content/step-2-skill/README.md"
+          n=$(grep -c '^- \[ \]' "$f" || true)
+          if [ "$n" -lt 4 ]; then
+            echo "::error::Done checklist has only $n items (need >= 4)"
+            exit 1
+          fi
+          echo "✅ T-203 PASS (Done checklist has $n items)"
+
+      # T-PHASE05-204: escape hatch branch step-2-complete が origin に存在
+      - name: T-204 escape hatch branch exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin step-2-complete | grep -q step-2-complete; then
+            echo "✅ T-204 PASS (step-2-complete branch found on origin)"
+          else
+            echo "::error::origin/step-2-complete branch not found"
+            exit 1
+          fi
+
+      # T-PHASE05-205: Step 2 固有文言 (D16)
+      # phase-05-step2-skill.md D16 で定めた Step 2 設計判断を CI で守る:
+      # - YAML frontmatter 必須キー言及 (^name: / ^description:)
+      # - .github/skills/ パス言及 (D8 / R05-4 typo 対策)
+      # - git commit 動詞言及 (D2 cli_direct)
+      # - Memory bootstrap 文言 + step-1-memory への link (D15 escape hatch ケア)
+      # - /skills list (D13 確定 / E7-cli-skill PoC、CLI surface 必須)
+      # - playground repo 反映誘導 (R05-7 強化、Step 3 前提)
+      - name: T-205 Step 2 design keywords present (E7 reframe = Local/Published model)
+        run: |
+          set -euo pipefail
+          f="content/step-2-skill/README.md"
+          missing=0
+          # === Group A: structural / spec facts (kept from original) ===
+          # A-1: frontmatter required key (name)
+          grep -qE '^name:' "$f" || {
+            echo "::error::missing required keyword: ^name: (frontmatter required key)"
+            missing=$((missing+1))
+          }
+          # A-2: frontmatter required key (description)
+          grep -qE '^description:' "$f" || {
+            echo "::error::missing required keyword: ^description: (frontmatter required key)"
+            missing=$((missing+1))
+          }
+          # A-3: project skill path
+          grep -qE '\.github/skills/' "$f" || {
+            echo "::error::missing required keyword: .github/skills/ (project skill path, D8)"
+            missing=$((missing+1))
+          }
+          # A-4: cli_direct commit verb
+          grep -q 'git commit' "$f" || {
+            echo "::error::missing required keyword: git commit (D2 cli_direct)"
+            missing=$((missing+1))
+          }
+          # A-5: Memory bootstrap escape-hatch link (D15)
+          grep -q 'Memory bootstrap' "$f" || {
+            echo "::error::missing required keyword: Memory bootstrap (D15 escape hatch care)"
+            missing=$((missing+1))
+          }
+          grep -q 'step-1-memory' "$f" || {
+            echo "::error::missing required link: step-1-memory (D15 cross-reference)"
+            missing=$((missing+1))
+          }
+          # A-6: /skills list (D13)
+          grep -q '/skills list' "$f" || {
+            echo "::error::missing required keyword: /skills list (D13 CLI surface)"
+            missing=$((missing+1))
+          }
+          # A-7: playground default-branch push (R05-7 / publication boundary)
+          if ! grep -qE 'playground.*push|playground.*default branch' "$f"; then
+            echo "::error::missing required keyword: playground (.*push|.*default branch) (R05-7 Step 3 prereq)"
+            missing=$((missing+1))
+          fi
+          # === Group B: E7-reframe concept keywords (Local/Published model) ===
+          # B-1: Local invariance concept (Local / ローカル / Local invariance)
+          if ! grep -qE 'Local invariance|Local 即効|ローカル' "$f"; then
+            echo "::error::missing concept keyword: Local invariance|ローカル (E7 reframe core)"
+            missing=$((missing+1))
+          fi
+          # B-2: publication boundary concept
+          if ! grep -qE 'publication|publish|push' "$f"; then
+            echo "::error::missing concept keyword: publication|publish|push (E7 reframe core)"
+            missing=$((missing+1))
+          fi
+          # B-3: uncommitted state explicitly named
+          if ! grep -qE 'uncommitted|未 commit|未commit' "$f"; then
+            echo "::error::missing concept keyword: uncommitted|未 commit (F4/F15/F17)"
+            missing=$((missing+1))
+          fi
+          # B-4: folded scalar / YAML syntax requirement
+          if ! grep -qE 'folded scalar|>-' "$f"; then
+            echo "::error::missing concept keyword: folded scalar|>- (YAML 4 requirements)"
+            missing=$((missing+1))
+          fi
+          # B-5: Cloud Agent referenced as Step 3 motivation
+          if ! grep -qiE 'Cloud Agent|cloud agent' "$f"; then
+            echo "::error::missing concept keyword: Cloud Agent (Step 3 motivation, F19-F21)"
+            missing=$((missing+1))
+          fi
+          # === Group C: structural — 2-stage done checklist (Local done / Published done) ===
+          if ! grep -q 'Local done' "$f"; then
+            echo "::error::missing structure: 'Local done' section (2-stage done, rubber-duck #7)"
+            missing=$((missing+1))
+          fi
+          if ! grep -q 'Published done' "$f"; then
+            echo "::error::missing structure: 'Published done' section (2-stage done, rubber-duck #7)"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 2 design keyword check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-205 PASS (Group A spec facts + Group B E7-reframe concepts + Group C 2-stage done)"
+
+  step-3-gate:
+    name: Step 3 — README structure / links / 3-stage done / keywords / negative gate / escape hatch (Phase 06)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # T-PHASE06-301: Step 3 README に必須 7 セクション + Status badge
+      - name: T-301 README structure (7 required sections + Status badge)
+        run: |
+          set -euo pipefail
+          f="content/step-3-surfaces/README.md"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          required=(
+            '^## 1\. 学習目標'
+            '^## 2\. 前提'
+            '^## 3\. 手順'
+            '^## 4\. 完了確認'
+            '^## 5\. 詰まったら'
+            '^## 6\. 次の Step'
+            '^## 7\. 参考'
+          )
+          missing=0
+          for re in "${required[@]}"; do
+            if ! grep -Eq "$re" "$f"; then
+              echo "::error::missing section matching: $re"
+              missing=$((missing+1))
+            fi
+          done
+          if ! grep -Eq '!\[Status\]\(.*Status-published|必須 Step|必須 \(MUST' "$f"; then
+            echo "::error::missing Status badge / 必須 indicator"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 3 README structure check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-301 PASS (all required sections + Status badge present)"
+
+      # T-PHASE06-302: Step 3 README の内部 link 死活
+      - name: T-302 internal links resolve
+        run: |
+          set -euo pipefail
+          f="content/step-3-surfaces/README.md"
+          mapfile -t links < <(
+            grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?:|file:|#|mailto:)' \
+              | sed -E 's/#.*$//' \
+              | grep -vE '^$' \
+              | sort -u
+          )
+          base="$(dirname "$f")"
+          missing=0
+          for l in "${links[@]}"; do
+            target="${base}/${l}"
+            if [ ! -e "$target" ]; then
+              echo "::error::broken internal link: $l (resolved to $target)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-302 PASS (${#links[@]} links checked)"
+
+      # T-PHASE06-303: Step 3 README の 3 段階 Done checklist 構造
+      # Local crossed / Cloud crossed (minimum) / Cloud triage observed (full)
+      # 各 stage に >= 4 項目 (合計だけでなく structural にも各セクション headers が必要)
+      - name: T-303 done checklist 3-stage structure (each >= 4 items in spirit)
+        run: |
+          set -euo pipefail
+          f="content/step-3-surfaces/README.md"
+          missing=0
+          for header in 'Local crossed' 'Cloud crossed (minimum)' 'Cloud triage observed (full)'; do
+            if ! grep -qF "$header" "$f"; then
+              echo "::error::missing 3-stage done header: $header (rubber-duck #3)"
+              missing=$((missing+1))
+            fi
+          done
+          n=$(grep -c '^- \[ \]' "$f" || true)
+          if [ "$n" -lt 4 ]; then
+            echo "::error::Done checklist has only $n items total (need >= 4)"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-303 PASS (3-stage done headers present + $n total checklist items)"
+
+      # T-PHASE06-304: escape hatch branch step-3-complete が origin に存在
+      - name: T-304 escape hatch branch exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin step-3-complete | grep -q step-3-complete; then
+            echo "✅ T-304 PASS (step-3-complete branch found on origin)"
+          else
+            echo "::error::origin/step-3-complete branch not found"
+            exit 1
+          fi
+
+      # T-PHASE06-305: Step 3 固有 keyword (positive Group A/B/C) + 禁止 token (negative Group D)
+      # phase-06-step3-surfaces.md D16 / plan.md v2 §3 D16 で定義された baked-in 設計判断を CI で守る:
+      #   Group A — structural / spec keyword (positive)
+      #   Group B — E7' reframe 概念 (positive)
+      #   Group C — structural 3-stage done (positive、T-303 で別途検証済)
+      #   Group D — learner-facing docs での禁止 token (negative)
+      # negative gate の対象: content/ 配下の learner-facing docs のみ。
+      # docs/planning/VERSIONS.md は superseded note / 政策宣言行で意図的に旧 token を
+      # 参照するため、negative gate からは exclude。
+      - name: T-305 Step 3 design keywords + negative token gate
+        run: |
+          set -euo pipefail
+          f="content/step-3-surfaces/README.md"
+          missing=0
+          # === Group A: structural / spec keyword (positive) ===
+          for kw in 'Issue Assignees' 'gh copilot' 'default branch' 'playground' '.github/skills/' 'GitHub Actions minutes'; do
+            grep -qF "$kw" "$f" || {
+              echo "::error::Group A missing keyword: $kw"
+              missing=$((missing+1))
+            }
+          done
+          # === Group B: E7' reframe concept (positive) ===
+          for kw in 'publication boundary' 'propagation' 'firewall' 'default deny' 'code-fix' 'suggestedActors'; do
+            grep -qF "$kw" "$f" || {
+              echo "::error::Group B missing concept: $kw"
+              missing=$((missing+1))
+            }
+          done
+          # === Group D: negative gate — learner-facing docs で旧 truth token を禁止 ===
+          # 対象: content/ 配下のすべての .md
+          banned_tokens=('copilot-swe-agent' '@copilot mention だけで起動' 'CLI が確実')
+          for tok in "${banned_tokens[@]}"; do
+            if grep -rnF "$tok" content/ 2>/dev/null; then
+              echo "::error::Group D banned token detected in learner-facing docs: '$tok'"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 3 keyword/negative gate failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-305 PASS (Group A spec keywords + Group B E7-reframe concepts + Group D negative gate clean)"
+
+  step-4-gate:
+    name: Step 4 — README structure / links / 3-stage done / keywords / negative marker gate / escape hatch (Phase 07)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # T-PHASE07-401: Step 4 README に必須 7 セクション + 必須 Step indicator
+      # Step 4 README は §1-§7 構成 (Step 1 README の §3.5 のような追加 sub-section は持たない)。
+      # SoT (phase-07-step4-automate.md §6.1) の「8 セクション」表記は Phase 04 carryover の
+      # 揺れ。実体は 7 sections + 必須 Step indicator (rubber-duck #1 I-1)。
+      - name: T-401 README structure (7 required sections + 必須 Step indicator)
+        run: |
+          set -euo pipefail
+          f="content/step-4-automate/README.md"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          required=(
+            '^## 1\. 学習目標'
+            '^## 2\. 前提'
+            '^## 3\. 手順'
+            '^## 4\. 完了確認'
+            '^## 5\. 詰まったら'
+            '^## 6\. 次の Step'
+            '^## 7\. 参考'
+          )
+          missing=0
+          for re in "${required[@]}"; do
+            if ! grep -Eq "$re" "$f"; then
+              echo "::error::missing section matching: $re"
+              missing=$((missing+1))
+            fi
+          done
+          if ! grep -Eq '必須 Step|必須 \(MUST' "$f"; then
+            echo "::error::missing 必須 Step indicator"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 4 README structure check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-401 PASS (7 required sections + 必須 Step indicator present)"
+
+      # T-PHASE07-402: Step 4 README の内部 link 死活
+      - name: T-402 internal links resolve
+        run: |
+          set -euo pipefail
+          f="content/step-4-automate/README.md"
+          mapfile -t links < <(
+            grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?:|file:|#|mailto:)' \
+              | sed -E 's/#.*$//' \
+              | grep -vE '^$' \
+              | sort -u
+          )
+          base="$(dirname "$f")"
+          missing=0
+          for l in "${links[@]}"; do
+            target="${base}/${l}"
+            if [ ! -e "$target" ]; then
+              echo "::error::broken internal link: $l (resolved to $target)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-402 PASS (${#links[@]} links checked)"
+
+      # T-PHASE07-403: Step 4 README の 3 段階 Done checklist 構造
+      # Setup ready / Step 4 minimum complete / Step 4 full complete の 3 header (### 4.1 / 4.2 / 4.3
+      # で header-anchored、本文 summary 行で誤 PASS させない、rubber-duck #1 S-1)
+      # 各 stage の `^- \[ \]` 数が >= 4 (rubber-duck #1 I-5 = per-stage check、SoT「各 4+ items」厳守)
+      - name: T-403 done checklist 3-stage structure (per-stage >= 4 items)
+        run: |
+          set -euo pipefail
+          f="content/step-4-automate/README.md"
+          missing=0
+          # === header anchoring (rubber-duck #1 S-1) ===
+          for hd in '### 4.1 Setup ready' '### 4.2 Step 4 minimum complete' '### 4.3 Step 4 full complete'; do
+            if ! grep -qF "$hd" "$f"; then
+              echo "::error::missing header literal: $hd"
+              missing=$((missing+1))
+            fi
+          done
+          # === per-stage count (rubber-duck #1 I-5) ===
+          # 各 stage block を awk で抽出 → ^- \[ \] を count → >= 4
+          # block 区切り = 次の "^### 4." または "^---" または "^## " で close
+          count_stage() {
+            local marker="$1"
+            awk -v M="$marker" '
+              $0 ~ "^"M {f=1; next}
+              f && /^### 4\./ {f=0}
+              f && /^---$/ {f=0}
+              f && /^## / {f=0}
+              f
+            ' "$f" | grep -c '^- \[ \]' || true
+          }
+          n1=$(count_stage '### 4.1 Setup ready')
+          n2=$(count_stage '### 4.2 Step 4 minimum complete')
+          n3=$(count_stage '### 4.3 Step 4 full complete')
+          for pair in "Setup ready:$n1" "Step 4 minimum complete:$n2" "Step 4 full complete:$n3"; do
+            stage="${pair%:*}"
+            n="${pair##*:}"
+            if [ "$n" -lt 4 ]; then
+              echo "::error::stage '$stage' has only $n items (need >= 4)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-403 PASS (3-stage headers anchored + per-stage items: ready=$n1 / min=$n2 / full=$n3)"
+
+      # T-PHASE07-404: escape hatch branch step-4-complete が origin に存在
+      # ★ C3 commit 直後は FAIL = 設計通り (C4 commit で緑化、Phase 11 で R03-7 復旧時に CI で確認)
+      - name: T-404 escape hatch branch exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin step-4-complete | grep -q step-4-complete; then
+            echo "✅ T-404 PASS (step-4-complete branch found on origin)"
+          else
+            echo "::error::origin/step-4-complete branch not found"
+            exit 1
+          fi
+
+      # T-PHASE07-405: Step 4 design keywords (Group A 構造/spec + Group B 概念 + Group C 3 段階 done)
+      # + Group D 禁止 token negative gate (★ marker block 抽出方式 = D15 / I1 / I6 / I8)
+      # phase-07-step4-automate.md D15 / I1 / I6 / I8 で定義された baked-in 設計判断を CI で守る:
+      #   Group A — gh-aw spec / Step 4 教材必須 keyword (positive)
+      #   Group B — Step 4 概念 (positive、★ I6 = 「自動起動」「イベント駆動 triage」統一語)
+      #   Group C — header-anchored 3 段階 done literal (positive、T-403 と相補的に検証)
+      #   Group D — marker block 抽出方式の negative gate:
+      #     D-pair: 4 marker 各 1 回 (full-line fixed string、rubber-duck #1 I-2)
+      #     D-order: marker 順序逆転検知 (rubber-duck #1 I-3)
+      #     D-1: <!-- step4-final-workflow-{start,end} --> 内 + canonical template file 直接 で
+      #          'issues: write' 0 件 (★ <!-- step4-demo-fail-* --> 内は意図的に許容)
+      #          template 直接検査は rubber-duck #1 I-4 反映
+      #     D-2/3: content/** 全 .md で「自動 assign」「自動assign」 0 件 (★ I8 paths scope)
+      - name: T-405 Step 4 design keywords + negative marker gate
+        run: |
+          set -euo pipefail
+          f="content/step-4-automate/README.md"
+          tmpl="content/step-4-automate/templates/triage-issue.md"
+          missing=0
+
+          # === Group A: structural / spec keyword (positive、grep -qF) ===
+          for kw in 'gh aw' 'safe-outputs' 'add-labels' 'add-comment' \
+                    'COPILOT_GITHUB_TOKEN' 'workflow_dispatch' 'inputs.issue_number' \
+                    'permissions: contents: read' 'triage-issue.md'; do
+            grep -qF "$kw" "$f" || {
+              echo "::error::Group A missing keyword: $kw"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group B: Step 4 concept (positive、grep -qE) ===
+          # ★ I6 = 「自動起動」「イベント駆動 triage」統一語、「自動 assign」廃止
+          # ★ rubber-duck #1 S-2 = agentic を agentic workflow|agentic job|Agentic Workflows に強化
+          for kw in 'strict mode' '自動起動' 'イベント駆動 triage' \
+                    'safe-outputs ガードレール' 'agentic workflow|agentic job|Agentic Workflows' \
+                    'dispatcher' 'Copilot CLI engine'; do
+            grep -qE "$kw" "$f" || {
+              echo "::error::Group B missing concept: $kw"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group C: header-anchored 3-stage done literal (positive) ===
+          # ★ rubber-duck #1 S-1 = header anchoring (T-403 と相補)
+          for hd in '### 4.1 Setup ready' '### 4.2 Step 4 minimum complete' '### 4.3 Step 4 full complete'; do
+            grep -qF "$hd" "$f" || {
+              echo "::error::Group C missing header literal: $hd"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group D-pair: 4 marker 各 1 回 (full-line fixed string) ===
+          # ★ rubber-duck #1 I-2 = grep -xcF で行全体一致、本文中の説明的言及で誤カウントしない
+          for m in step4-final-workflow-start step4-final-workflow-end \
+                   step4-demo-fail-start step4-demo-fail-end; do
+            expected="<!-- $m -->"
+            c=$(grep -xcF "$expected" "$f" || true)
+            if [ "$c" -ne 1 ]; then
+              echo "::error::Group D-pair: marker line '$expected' count=$c (must be exactly 1)"
+              missing=$((missing+1))
+            fi
+          done
+
+          # === Group D-order: marker 順序逆転検知 ===
+          # ★ rubber-duck #1 I-3 = start_line < end_line を line number で検証
+          check_order() {
+            local start_marker="<!-- $1-start -->"
+            local end_marker="<!-- $1-end -->"
+            local s e
+            s=$(grep -nxF "$start_marker" "$f" | head -1 | cut -d: -f1 || true)
+            e=$(grep -nxF "$end_marker" "$f" | head -1 | cut -d: -f1 || true)
+            if [ -z "$s" ] || [ -z "$e" ]; then
+              echo "::error::Group D-order: $1 markers not both found (start=$s end=$e)"
+              return 1
+            fi
+            if [ "$s" -ge "$e" ]; then
+              echo "::error::Group D-order: $1 marker order wrong (start_line=$s end_line=$e)"
+              return 1
+            fi
+            return 0
+          }
+          check_order step4-final-workflow || missing=$((missing+1))
+          check_order step4-demo-fail || missing=$((missing+1))
+
+          # === Group D-1: final-workflow block 内 + canonical template に issues: write 0 件 ===
+          # ★ rubber-duck #1 I-4 = canonical template `triage-issue.md` も直接検査して regression 検知
+          # 悪い例 block <!-- step4-demo-fail-* --> 内は意図的に許容 (教材として必要)
+          final_block=$(awk '/<!-- step4-final-workflow-start -->/{f=1; next} \
+                             /<!-- step4-final-workflow-end -->/{f=0} f' "$f")
+          if echo "$final_block" | grep -qE "issues:[[:space:]]*write"; then
+            echo "::error::Group D-1: 'issues: write' inside step4-final-workflow block in README"
+            missing=$((missing+1))
+          fi
+          if [ -f "$tmpl" ]; then
+            if grep -qE "issues:[[:space:]]*write" "$tmpl"; then
+              echo "::error::Group D-1: 'issues: write' found in canonical template $tmpl"
+              missing=$((missing+1))
+            fi
+          else
+            echo "::error::Group D-1: canonical template not found: $tmpl"
+            missing=$((missing+1))
+          fi
+
+          # === Group D-2/3: content/** 内に「自動 assign」「自動assign」 0 件 ===
+          # ★ I8 paths scope = content/** 限定、docs/planning/ は exclude (歴史的言及 OK)
+          # 検査対象は content/ 配下全体 (現状 .md のみだが将来追加ファイルも含めてカバー)
+          if grep -rnE "自動 ?assign" content/ 2>/dev/null; then
+            echo "::error::Group D-2/3: '自動 assign' or '自動assign' detected in learner-facing content/"
+            missing=$((missing+1))
+          fi
+
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 4 keyword/negative gate failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-405 PASS (Group A spec + Group B concepts + Group C 3-stage anchored + Group D marker block negative gate clean)"
+
+  step-5-gate:
+    name: Step 5 — README structure / links / 4-state done / keywords / negative marker gate / escape hatch (Phase 08)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # T-PHASE08-501: Step 5 README に必須 7 セクション + 任意 Step indicator
+      # Step 5 README は §1-§7 構成 (§4 = Fallback decision tree、§5 = Troubleshooting)。
+      # 任意 Step (OPTIONAL) であることを明示する indicator を強制 (R08-5 = 任意 Step 救済 3 箇所明示)。
+      - name: T-501 README structure (7 required sections + 任意 Step indicator)
+        run: |
+          set -euo pipefail
+          f="content/step-5-multi-engine/README.md"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          required=(
+            '^## 1\. 学習目標'
+            '^## 2\. 前提'
+            '^## 3\. 演習'
+            '^## 4\. Fallback decision tree'
+            '^## 5\. Troubleshooting'
+            '^## 6\. 完了確認'
+            '^## 7\. 参考'
+          )
+          missing=0
+          for re in "${required[@]}"; do
+            if ! grep -Eq "$re" "$f"; then
+              echo "::error::missing section matching: $re"
+              missing=$((missing+1))
+            fi
+          done
+          if ! grep -Eq '任意 Step|OPTIONAL|任意 \(OPT' "$f"; then
+            echo "::error::missing 任意 Step indicator (OPTIONAL marking)"
+            missing=$((missing+1))
+          fi
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 5 README structure check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-501 PASS (7 required sections + 任意 Step indicator present)"
+
+      # T-PHASE08-502: Step 5 README の内部 link 死活 (recordings/README.md placeholder も含む)
+      - name: T-502 internal links resolve
+        run: |
+          set -euo pipefail
+          f="content/step-5-multi-engine/README.md"
+          mapfile -t links < <(
+            grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?:|file:|#|mailto:)' \
+              | sed -E 's/#.*$//' \
+              | grep -vE '^$' \
+              | sort -u
+          )
+          base="$(dirname "$f")"
+          missing=0
+          for l in "${links[@]}"; do
+            target="${base}/${l}"
+            if [ ! -e "$target" ]; then
+              echo "::error::broken internal link: $l (resolved to $target)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-502 PASS (${#links[@]} links checked)"
+
+      # T-PHASE08-503: Step 5 README の 4 状態 done check (D08-7)
+      # Setup ready / Step 5 minimum live complete / Step 5 full live complete / Step 5 fallback complete
+      # Step 4 と異なり ### 6.x sub-header ではなく §6 単一 section 内の bullet 4 行で表現される設計。
+      # 各 done state literal が `- [ ]` checkbox 行として 1+ 出現することを検証。
+      - name: T-503 done check 4-state structure
+        run: |
+          set -euo pipefail
+          f="content/step-5-multi-engine/README.md"
+          missing=0
+          for state in 'Setup ready' 'Step 5 minimum live complete' 'Step 5 full live complete' 'Step 5 fallback complete'; do
+            if ! grep -qE "^- \[ \].*${state}" "$f"; then
+              echo "::error::missing done-state checkbox literal: '$state'"
+              missing=$((missing+1))
+            fi
+          done
+          # 昇格判断 invariant 2 状態 (Group 3 = verification target)
+          for inv in 'confirmed' 'partially confirmed'; do
+            if ! grep -qE "^- \[ \].*\`${inv}\`" "$f"; then
+              echo "::error::missing invariant promotion checkbox: '$inv'"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-503 PASS (4 done states + 2 invariant promotion states present)"
+
+      # T-PHASE08-504: escape hatch branch step-5-complete が origin に存在
+      # ★ C3 commit 直後は FAIL = 設計通り (C4 commit で緑化、Phase 11 で R03-7 復旧時に CI で確認)
+      - name: T-504 escape hatch branch exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin step-5-complete | grep -q step-5-complete; then
+            echo "✅ T-504 PASS (step-5-complete branch found on origin)"
+          else
+            echo "::error::origin/step-5-complete branch not found"
+            exit 1
+          fi
+
+      # T-PHASE08-505: Step 5 design keywords + negative marker gate
+      # phase-08-step5-multi-engine.md D08-13 / D08-14 で baked-in:
+      #   Group A — gh-aw spec / engine stanza / engine x secret keyword (positive)
+      #     ※ engine stanza canonical syntax は両形 OR (scalar `engine: claude` / object `engine:\n  id: claude`)
+      #       を受理 (D08-13、Phase 11 dogfooding で単形収束を再判断)
+      #   Group B — Step 5 概念 (positive、6+ 概念)
+      #   Group C — 4 状態 done literal (positive、T-503 と相補的に検証)
+      #   Group D — marker block 抽出方式 negative gate:
+      #     D-pair: 4 marker 各 1 回 (full-line fixed string)
+      #     D-order: marker 順序逆転検知
+      #     D-1: <!-- step5-final-workflow-{start,end} --> 内 + canonical template に
+      #          'issues: write' 0 件 (★ <!-- step5-engine-fail-* --> 内は意図的に許容、教材として必要)
+      - name: T-505 Step 5 design keywords + negative marker gate
+        run: |
+          set -euo pipefail
+          f="content/step-5-multi-engine/README.md"
+          tmpl="content/step-5-multi-engine/templates/triage-issue-engine-swap.md"
+          missing=0
+
+          # === Group A: structural / spec / engine x secret keyword (positive、grep -qF) ===
+          for kw in 'gh aw' 'engine: copilot' 'engine: claude' 'engine: codex' \
+                    'COPILOT_GITHUB_TOKEN' 'ANTHROPIC_API_KEY' 'OPENAI_API_KEY' \
+                    'safe-outputs' 'triage-issue.md'; do
+            grep -qF "$kw" "$f" || {
+              echo "::error::Group A missing keyword: $kw"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group A engine stanza canonical syntax 両形 OR (D08-13) ===
+          # 教材として scalar 形 `engine: claude` (Group A 上で確認済) と
+          # object 形 `engine:\n  id: claude` の両方が canonical として提示されていることを保証。
+          # awk で multi-line 検査 (`engine:` 行の直後に `id: claude` 等が来るパターン)。
+          if ! awk '/^engine:[[:space:]]*$/{getline next_line; if (next_line ~ /^[[:space:]]+id:[[:space:]]+(copilot|claude|codex)/) found=1} END {exit !found}' "$f"; then
+            echo "::error::Group A object-form engine stanza (engine:\\n  id: <name>) not found (D08-13 両形 OR canonical)"
+            missing=$((missing+1))
+          fi
+
+          # === Group B: Step 5 concept (positive、grep -qE) ===
+          # 任意 Step heavy 化 + engine 横断 invariant + 録画 fallback + 4 状態 done + decision tree
+          for kw in '任意 Step|OPTIONAL' \
+                    'engine 切替|engine 横断 invariant|engine stanza' \
+                    '録画 fallback|録画視聴' \
+                    '比較表|比較 表|head-to-head' \
+                    'verification target|safe.?outputs ガードレール' \
+                    'decision tree|decision-tree|fallback decision'; do
+            grep -qE "$kw" "$f" || {
+              echo "::error::Group B missing concept regex: $kw"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group C: 4 状態 done literal (positive、T-503 と相補) ===
+          for state in 'Setup ready' 'Step 5 minimum live complete' 'Step 5 full live complete' 'Step 5 fallback complete'; do
+            grep -qF "$state" "$f" || {
+              echo "::error::Group C missing done-state literal: $state"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group D-pair: 4 marker 各 1 回 (full-line fixed string) ===
+          for m in step5-final-workflow-start step5-final-workflow-end \
+                   step5-engine-fail-start step5-engine-fail-end; do
+            # engine-fail markers may be inline in blockquote (with leading "> "), so allow that prefix
+            expected="<!-- $m -->"
+            c_strict=$(grep -xcF "$expected" "$f" || true)
+            c_loose=$(grep -cE "^(> )?<!-- $m -->\$" "$f" || true)
+            c=$c_loose
+            if [ "$c" -ne 1 ]; then
+              echo "::error::Group D-pair: marker line '$expected' count=$c (must be exactly 1, strict=$c_strict)"
+              missing=$((missing+1))
+            fi
+          done
+
+          # === Group D-order: marker 順序逆転検知 ===
+          check_order() {
+            local pair="$1"
+            local s e
+            s=$(grep -nE "^(> )?<!-- ${pair}-start -->\$" "$f" | head -1 | cut -d: -f1 || true)
+            e=$(grep -nE "^(> )?<!-- ${pair}-end -->\$" "$f" | head -1 | cut -d: -f1 || true)
+            if [ -z "$s" ] || [ -z "$e" ]; then
+              echo "::error::Group D-order: $pair markers not both found (start=$s end=$e)"
+              return 1
+            fi
+            if [ "$s" -ge "$e" ]; then
+              echo "::error::Group D-order: $pair marker order wrong (start_line=$s end_line=$e)"
+              return 1
+            fi
+            return 0
+          }
+          check_order step5-final-workflow || missing=$((missing+1))
+          check_order step5-engine-fail || missing=$((missing+1))
+
+          # === Group D-1: final-workflow block 内 + canonical template に issues: write 0 件 ===
+          # engine-fail block (<!-- step5-engine-fail-* -->) は意図的に許容 (教材として必要な悪い例)
+          final_block=$(awk '/<!-- step5-final-workflow-start -->/{f=1; next} \
+                             /<!-- step5-final-workflow-end -->/{f=0} f' "$f")
+          if echo "$final_block" | grep -qE "issues:[[:space:]]*write"; then
+            echo "::error::Group D-1: 'issues: write' inside step5-final-workflow block in README"
+            missing=$((missing+1))
+          fi
+          if [ -f "$tmpl" ]; then
+            if grep -qE "^[[:space:]]*\+?[[:space:]]*issues:[[:space:]]*write" "$tmpl"; then
+              echo "::error::Group D-1: 'issues: write' found as canonical (additive) line in template $tmpl"
+              missing=$((missing+1))
+            fi
+          else
+            echo "::error::Group D-1: canonical template not found: $tmpl"
+            missing=$((missing+1))
+          fi
+
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 5 keyword/negative gate failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-505 PASS (Group A spec + 両形 OR engine stanza + Group B concepts + Group C 4-state + Group D marker block negative gate clean)"
+
+  step-6-gate:
+    name: Step 6 — README structure / links / 4-state done / keywords / negative gate / .agent.md safety / escape hatch (Phase 09)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # T-PHASE09-601: Step 6 README に必須 7 セクション
+      # README は §1-§7 構成 (§1 学習目標 / §2 前提 / §3 手順 / §4 4 状態 done + matrix /
+      # §5 RESULT block + Troubleshooting / §6 Recap / §7 録画). §3 Appendix は別 H2.
+      - name: T-601 README structure (7 required sections)
+        run: |
+          set -euo pipefail
+          f="content/step-6-gate/README.md"
+          test -f "$f" || { echo "::error::$f not found"; exit 1; }
+          required=(
+            '^## 1\. 学習目標'
+            '^## 2\. 前提'
+            '^## 3\. 手順'
+            '^## 4\. 4 状態 done'
+            '^## 5\. RESULT block'
+            '^## 6\. Recap'
+            '^## 7\. 録画'
+          )
+          missing=0
+          for re in "${required[@]}"; do
+            if ! grep -Eq "$re" "$f"; then
+              echo "::error::missing section matching: $re"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 6 README structure check failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-601 PASS (7 required sections present)"
+
+      # T-PHASE09-602: Step 6 README の内部 link 死活 (agents/, templates/, recordings/ placeholder)
+      - name: T-602 internal links resolve
+        run: |
+          set -euo pipefail
+          f="content/step-6-gate/README.md"
+          mapfile -t links < <(
+            grep -oE '\]\([^)]+\)' "$f" \
+              | sed -E 's/^\]\(//; s/\)$//' \
+              | grep -vE '^(https?:|file:|#|mailto:)' \
+              | sed -E 's/#.*$//' \
+              | grep -vE '^$' \
+              | sort -u
+          )
+          base="$(dirname "$f")"
+          missing=0
+          for l in "${links[@]}"; do
+            target="${base}/${l}"
+            if [ ! -e "$target" ]; then
+              echo "::error::broken internal link: $l (resolved to $target)"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-602 PASS (${#links[@]} links checked)"
+
+      # T-PHASE09-603: Step 6 README の 4 状態 done literal + 5 path completion matrix (D09-7 / D09-11)
+      # 4 states: Setup ready / Step 6a minimum complete / Step 6a full complete / Step 6b complete
+      # 5 paths: Full path / Pro-Pro path / Free path / Degraded path / Workflow-Advanced path
+      - name: T-603 4-state done + 5-path completion matrix
+        run: |
+          set -euo pipefail
+          f="content/step-6-gate/README.md"
+          missing=0
+          for state in 'Setup ready' 'Step 6a minimum complete' 'Step 6a full complete' 'Step 6b complete'; do
+            if ! grep -qF "$state" "$f"; then
+              echo "::error::missing done-state literal: '$state'"
+              missing=$((missing+1))
+            fi
+          done
+          for path in 'Full path' 'Pro-Pro path' 'Free path' 'Degraded path' 'Workflow-Advanced path'; do
+            if ! grep -qF "$path" "$f"; then
+              echo "::error::missing completion-matrix path literal: '$path'"
+              missing=$((missing+1))
+            fi
+          done
+          # E11 marker 5 段階 (Important 10 / D09-12)
+          for marker in 'E11-Setup' 'E11-Minimum' 'E11-Full' 'E11-Degraded' 'E11-Workflow-Advanced'; do
+            if ! grep -qF "$marker" "$f"; then
+              echo "::error::missing E11 marker literal: '$marker'"
+              missing=$((missing+1))
+            fi
+          done
+          if [ "$missing" -gt 0 ]; then exit 1; fi
+          echo "✅ T-603 PASS (4 done states + 5 completion paths + 5 E11 markers present)"
+
+      # T-PHASE09-604: escape hatch branch step-6-complete が origin に存在
+      # ★ C3 commit 直後は FAIL = 設計通り (C4 commit で緑化、Phase 11 で R03-7 復旧時に CI で確認)
+      - name: T-604 escape hatch branch exists
+        run: |
+          set -euo pipefail
+          if git ls-remote --heads origin step-6-complete | grep -q step-6-complete; then
+            echo "✅ T-604 PASS (step-6-complete branch found on origin)"
+          else
+            echo "::error::origin/step-6-complete branch not found"
+            exit 1
+          fi
+
+      # T-PHASE09-605: Step 6 design keywords + .agent.md safety + 用語混同抑止 negative gate
+      # phase-09-step6-gate.md §5 / §10.4 で baked-in:
+      #   Group A — Step 6 spec / UI / Required Review Gate keyword (positive)
+      #   Group B — Step 6 概念 (positive、5+ 概念)
+      #   Group C — 4 状態 done literal (T-603 と相補的に検証済、本 task では skip)
+      #   Group D — .agent.md 安全性 (Important 7) + 用語混同抑止 (Important 5):
+      #     D-1: agents/code-reviewer.agent.md の tools が read/search のみ
+      #          (edit / shell / broad write が含まれないこと)
+      #     D-2: agents/code-reviewer.agent.md frontmatter に permissions: field なし
+      #          (GitHub Actions 風 field との混同抑止)
+      #     D-3: content/** で `.agent.md` を Required Check と断定する文 0 件
+      #     D-4: content/** で Copilot Code Review を Required Status Check と断定する文 0 件
+      #     D-5: content/** で 'auto approve' / 'merge automatically' / 'bypass branch protection' 0 件
+      - name: T-605 Step 6 design keywords + .agent.md safety + negative gate
+        run: |
+          set -euo pipefail
+          f="content/step-6-gate/README.md"
+          agent="content/step-6-gate/agents/code-reviewer.agent.md"
+          missing=0
+
+          # === Group A: spec / UI / Required Review Gate keyword (positive、grep -qF) ===
+          for kw in 'branch protection' 'Require pull request' 'Copilot Code Review' 'Required reviewer' \
+                    '.agent.md' 'Required Review Gate'; do
+            grep -qF "$kw" "$f" || {
+              echo "::error::Group A missing keyword: $kw"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group B: Step 6 concept (positive、grep -qE) ===
+          for kw in 'merge gate|Required Review Gate' \
+                    'Trust thread' \
+                    'human review|人間.*レビュー|レビュアー' \
+                    'Path C' \
+                    'Path A/B|Check Run Agents' \
+                    'plan ?/ ?permission|completion matrix'; do
+            grep -qE "$kw" "$f" || {
+              echo "::error::Group B missing concept regex: $kw"
+              missing=$((missing+1))
+            }
+          done
+
+          # === Group D-1: .agent.md sample tools = read/search のみ (edit/shell/broad write 禁止) ===
+          test -f "$agent" || { echo "::error::Group D-1: $agent not found"; missing=$((missing+1)); }
+          if [ -f "$agent" ]; then
+            # frontmatter (between first two ---) から tools 行を抽出
+            tools_line=$(awk '/^---$/{c++; next} c==1 && /^tools:/{print; exit}' "$agent" || true)
+            if [ -z "$tools_line" ]; then
+              echo "::error::Group D-1: 'tools:' field not found in $agent frontmatter"
+              missing=$((missing+1))
+            else
+              # 許可された tool だけが含まれることを確認 (read / search 以外を含む = NG)
+              banned_tools='\b(edit|shell|write|delete|bash|exec|admin)\b'
+              if echo "$tools_line" | grep -qiE "$banned_tools"; then
+                echo "::error::Group D-1: banned tool detected in $agent tools field: $tools_line"
+                missing=$((missing+1))
+              fi
+            fi
+          fi
+
+          # === Group D-2: .agent.md frontmatter に permissions: field なし (Actions 風 field 混同抑止) ===
+          if [ -f "$agent" ]; then
+            if awk '/^---$/{c++; next} c==1' "$agent" | grep -qE '^permissions:'; then
+              echo "::error::Group D-2: 'permissions:' field present in .agent.md frontmatter (混同抑止: GitHub Actions field)"
+              missing=$((missing+1))
+            fi
+          fi
+
+          # === Group D-3: content/** で .agent.md を Required Check と断定する文 0 件 ===
+          banned_assertions=(
+            '.agent.md can be a Required Check today'
+            'agent.md を Required Check として登録できます'
+            '.agent.md は Required Status Check'
+          )
+          for tok in "${banned_assertions[@]}"; do
+            if grep -rnF "$tok" content/ 2>/dev/null; then
+              echo "::error::Group D-3: false assertion about .agent.md as Required Check: '$tok'"
+              missing=$((missing+1))
+            fi
+          done
+
+          # === Group D-4: Copilot Code Review を Required Status Check と断定する文 0 件 (Important 5) ===
+          # 否定文 (例: 「は Status Check ではない」) は教材として必要なので除外。
+          # 断定形 (です / だ / である / can be / is) のみを禁止対象とする。
+          # rubber-duck #2 Important 2 反映: copula なし日本語体言止め断定 (`は Required Status Check` で行末 / 句点)
+          # も検出する alternative を追加。除外側 (ではない) は同一行内の対象近傍のみに有効化。
+          while IFS= read -r hit; do
+            echo "::error::Group D-4: false Status Check assertion: $hit"
+            missing=$((missing+1))
+          done < <( ( \
+            grep -rnE 'Copilot Code Review[^。\n]{0,40}(Required )?Status Check[^。\n]{0,5}(です|だ|である|can be|is a|は Required)' content/ 2>/dev/null || true; \
+            grep -rnE 'Copilot Code Review[^。\n]{0,40}は[[:space:]]*Required Status Check[[:space:]]*([、。)]|$)' content/ 2>/dev/null || true; \
+            grep -rnE 'Copilot Code Review[[:space:]]+(can be|is)[[:space:]]+(a |the )?(Required )?Status Check' content/ 2>/dev/null || true \
+          ) | sort -u | grep -vE 'Status Check ではない|Status Check ではありません|Status Check じゃない|not a Required Status Check|not the Required Status Check|is not a Required Status Check' || true)
+
+          # === Group D-5: content/** で merge bypass / auto-approve 系の不適切表現 0 件 ===
+          banned_bypass=('auto approve' 'auto-approve' 'merge automatically' 'bypass branch protection')
+          for tok in "${banned_bypass[@]}"; do
+            if grep -rniF "$tok" content/ 2>/dev/null; then
+              echo "::error::Group D-5: banned bypass token detected: '$tok'"
+              missing=$((missing+1))
+            fi
+          done
+
+          if [ "$missing" -gt 0 ]; then
+            echo "::error::Step 6 keyword/.agent.md safety/negative gate failed ($missing issues)"
+            exit 1
+          fi
+          echo "✅ T-605 PASS (Group A spec + Group B concepts + Group D agent safety + 用語混同抑止 + bypass negative gate clean)"

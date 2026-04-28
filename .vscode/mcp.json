@@ -1,0 +1,12 @@
+{
+  "//": "GitHub MCP Server (Remote) registration for VS Code Copilot Chat (Agent mode).",
+  "//1": "Required so that learners see `list_issues` / `update_issue` / `add_issue_comment` etc.",
+  "//2": "in the Chat tool palette during Step 0 (mini-triage).",
+  "//3": "Auth: PAT-less. The Codespaces VS Code session inherits the user's GitHub OAuth.",
+  "servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    }
+  }
+}

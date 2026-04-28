@@ -1,0 +1,43 @@
+# Minimal pull_request trigger workflow for Step 6 Appendix B (E11-Workflow-Advanced)
+#
+# Why this template exists (Blocking 2 / D09-9):
+# - Step 4 `triage-issue.md` uses `on: issues.opened` / `workflow_dispatch` triggers,
+#   which are NOT eligible for Branch protection's "Required status checks" picker
+#   (the picker only shows checks that ran on the PR's head commit).
+# - To wire a workflow into the Required Status Check path, you need a `pull_request`
+#   trigger. This template is the smallest such workflow you can put on a Required Check.
+#
+# Usage (Step 6 README §3 Appendix B):
+#   1. Copy this file to `.github/workflows/pr-required-check.yml` in your playground repo.
+#   2. Open one PR so the workflow runs once (otherwise picker won't see it).
+#   3. Settings → Branches → edit your `main` rule → enable "Require status checks to
+#      pass before merging" → search for `pr-required-check` and add it.
+#   4. Open another PR to verify the check appears as Required.
+#
+# This workflow is intentionally trivial — it is meant to demonstrate the Required Status
+# Check WIRING, not to do useful triage. For real PR-time agentic checks, see Step 6b
+# `.agent.md` (currently preview / not GA = R11) or wrap a `gh aw` workflow with a
+# `pull_request` trigger (Phase 11 dogfooding).
+
+name: pr-required-check
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  required-check:
+    name: required-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivial PR sanity check
+        run: |
+          echo "PR #${{ github.event.pull_request.number }} head SHA: ${{ github.event.pull_request.head.sha }}"
+          echo "This is a Required Status Check sample (Step 6 Appendix B)."
+          echo "Replace this step with real PR-time validation in your own setup."

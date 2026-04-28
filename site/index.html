@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build Your Agentic Platform with GitHub Copilot — Coming Soon</title>
+  <meta name="description" content="GitHub Copilot で 6 層の Agentic Platform を段階的に構築するセルフラーニング型ワークショップ。近日公開。" />
+  <meta property="og:title" content="Build Your Agentic Platform with GitHub Copilot" />
+  <meta property="og:description" content="6 層で学ぶ AI エージェント実装ワークショップ — Coming Soon" />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#0d1117" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="./" aria-label="Workshop home">
+        <svg class="brand-mark" viewBox="0 0 16 16" width="28" height="28" aria-hidden="true">
+          <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8.013 8.013 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        <span class="brand-text">ghcp-6-layer-agentic-platform</span>
+      </a>
+      <span class="status-pill" aria-label="Site status">
+        <span class="status-dot"></span>
+        Under Construction
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero container">
+      <div class="hero-inner">
+        <span class="eyebrow">Self-Paced Workshop · Coming Soon</span>
+        <h1 class="hero-title">
+          Build Your Agentic Platform<br />
+          <span class="hero-title-accent">with GitHub Copilot</span>
+        </h1>
+        <p class="hero-sub">6 層で学ぶ AI エージェント実装ワークショップ</p>
+        <p class="hero-lede">
+          1 つの <code>SKILL.md</code> から始めて、MCP / Memory / Customizations / 実行サーフェス / Agentic Workflows / Agent HQ + Code Review の <strong>6 層</strong>を段階的に積み上げる、セルフラーニング型ワークショップ。
+        </p>
+
+        <div class="hero-meta">
+          <span class="meta-chip">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8 8 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+            GitHub Copilot
+          </span>
+          <span class="meta-chip">Self-Paced</span>
+          <span class="meta-chip">Japanese</span>
+          <span class="meta-chip">CLI · Cloud · IDE</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="qr-section container">
+      <div class="qr-card">
+        <div class="qr-card-text">
+          <h2>このページをブックマークしてください</h2>
+          <p>
+            正式公開時、このまま <strong>同じ URL</strong> にワークショップ本体が公開されます。
+            QR コードをスマホで読み取って、ブラウザのブックマークに追加しておいてください。
+          </p>
+          <div class="url-row">
+            <code id="site-url">https://shinyay.github.io/ghcp-6-layer-agentic-platform/</code>
+            <button class="copy-btn" type="button" aria-label="URL をコピー" data-copy="#site-url">
+              Copy
+            </button>
+          </div>
+          <p class="qr-hint">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" style="vertical-align:-2px"><path fill="currentColor" d="M8 1.5c-3.59 0-6.5 2.91-6.5 6.5s2.91 6.5 6.5 6.5 6.5-2.91 6.5-6.5S11.59 1.5 8 1.5zm-.25 3.75a.75.75 0 1 1 1.5 0v3.5a.75.75 0 0 1-1.5 0v-3.5zM8 12a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+            iPhone / Android のカメラアプリでそのまま読めます
+          </p>
+        </div>
+        <div class="qr-art">
+          <div class="qr-frame">
+            <img src="qr.svg" alt="Workshop URL の QR コード" width="320" height="320" />
+          </div>
+          <span class="qr-caption">Scan me</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="layers-section container">
+      <h2 class="section-title">
+        <span class="section-eyebrow">What's coming</span>
+        6 層を 1 つのシナリオで積み上げる
+      </h2>
+      <p class="section-lede">
+        ワークショップは <strong>Issue Triage Skill</strong> という 1 つのシナリオを軸に、Step 0 から Step 6 へ層を 1 つずつ追加していく構成です。最後にはあなたの repo に 6 層が揃った状態で完成します。
+      </p>
+
+      <ol class="layer-stack" aria-label="6-Layer Agentic Platform">
+        <li class="layer" data-n="6">
+          <span class="layer-num">L6</span>
+          <div class="layer-body">
+            <h3>Code Review</h3>
+            <p>Copilot Code Review を Required Check に。Custom Agent と並走</p>
+          </div>
+        </li>
+        <li class="layer" data-n="5">
+          <span class="layer-num">L5</span>
+          <div class="layer-body">
+            <h3>Multi-Engine</h3>
+            <p>Agent HQ で Claude / Codex / Copilot を同じ屋根の下に</p>
+          </div>
+        </li>
+        <li class="layer" data-n="4">
+          <span class="layer-num">L4</span>
+          <div class="layer-body">
+            <h3>Workflow</h3>
+            <p>gh aw — Markdown で書く Agentic Workflows + safe-outputs</p>
+          </div>
+        </li>
+        <li class="layer" data-n="3">
+          <span class="layer-num">L3</span>
+          <div class="layer-body">
+            <h3>実行サーフェス</h3>
+            <p>Cloud / CLI / IDE — どこからでも同じ Skill を呼ぶ</p>
+          </div>
+        </li>
+        <li class="layer" data-n="2">
+          <span class="layer-num">L2</span>
+          <div class="layer-body">
+            <h3>設定・拡張</h3>
+            <p>Skills / AGENTS.md / *.agent.md — 1 ファイルで挙動を定義</p>
+          </div>
+        </li>
+        <li class="layer" data-n="1">
+          <span class="layer-num">L1</span>
+          <div class="layer-body">
+            <h3>記憶基盤</h3>
+            <p>Copilot Memory — repo を超える文脈共有</p>
+          </div>
+        </li>
+        <li class="layer" data-n="0">
+          <span class="layer-num">L0</span>
+          <div class="layer-body">
+            <h3>プロトコル</h3>
+            <p>MCP — 外部ツール / データへの統一インターフェース</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="status-section container">
+      <div class="status-card">
+        <div class="status-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="36" height="36"><path fill="currentColor" d="M3 21h18v-2H3v2zM5 17h2v-7H5v7zm4 0h2V7H9v10zm4 0h2v-4h-2v4zm4 0h2V4h-2v13z"/></svg>
+        </div>
+        <div>
+          <h2>現在準備中です</h2>
+          <p>
+            正式公開は近日中を予定しています。コンテンツが揃い次第、このページが
+            ワークショップ本体に切り替わります。それまでブックマークだけお願いします 🙏
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 shinyay · Built with <a href="https://github.com/features/copilot" rel="noopener">GitHub Copilot CLI</a></p>
+      <p class="footer-meta">Theme inspired by <a href="https://primer.style/" rel="noopener">GitHub Primer</a></p>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelectorAll('.copy-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const target = document.querySelector(btn.dataset.copy);
+        if (!target) return;
+        try {
+          await navigator.clipboard.writeText(target.textContent.trim());
+          const original = btn.textContent;
+          btn.textContent = 'Copied!';
+          btn.classList.add('is-copied');
+          setTimeout(() => {
+            btn.textContent = original;
+            btn.classList.remove('is-copied');
+          }, 1500);
+        } catch (e) {
+          btn.textContent = 'Press ⌘/Ctrl+C';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

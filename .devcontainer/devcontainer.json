@@ -1,0 +1,25 @@
+{
+  "name": "6-Layer Agentic Platform Workshop",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "containerEnv": {
+    "GH_AW_VERSION": "v0.68.3"
+  },
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "GitHub.vscode-pull-request-github"
+      ],
+      "settings": {
+        "files.eol": "\n",
+        "editor.formatOnSave": false
+      }
+    }
+  },
+  "remoteUser": "codespace"
+}

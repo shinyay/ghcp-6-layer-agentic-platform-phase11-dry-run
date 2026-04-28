@@ -1,0 +1,94 @@
+name: L1 Smoke Test
+
+# Phase 02 introduces the first CI for this workshop repository.
+# This is the L1 layer of the test strategy defined in
+# docs/planning/test-plan-template.md §1: ensure that postCreate.sh runs
+# successfully and all required CLI tools are present and version-pinned.
+#
+# Runner choice:
+#   - GitHub-hosted ubuntu-latest (Phase 11 で R03-7 解消済 = self-hosted から
+#     ubuntu-latest 化、計 9 jobs。learner forks でも同 workflow を実行可能)。
+#   - ubuntu-latest には `gh` / `jq` / `curl` が pre-install されている
+#     (Codespaces universal:2 イメージとほぼ同等)。
+#
+# Trigger paths は意図的に `.devcontainer/**` と本 workflow file のみ
+# (= learner fork が `content/**` だけ編集した場合に smoke を走らせない)。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/smoke.yml'
+  pull_request:
+    paths:
+      - '.devcontainer/**'
+      - '.github/workflows/smoke.yml'
+  schedule:
+    # Every Monday 00:00 UTC (≈ Mon 09:00 JST) — catches upstream drift.
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  devcontainer-smoke:
+    name: postCreate.sh + verify required CLI tools (ubuntu-latest, Phase 11+)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_AW_VERSION: v0.68.3
+      GH_CLI_VERSION: 2.80.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify gh CLI present (ubuntu-latest provides it)
+        # ubuntu-latest runner pre-installs gh CLI. Below is a defensive
+        # bootstrap kept in place in case the runner image changes.
+        run: |
+          set -euo pipefail
+          if command -v gh >/dev/null 2>&1; then
+            echo "gh already on PATH: $(gh --version | head -n1)"
+          else
+            mkdir -p "${GITHUB_WORKSPACE}/.bin"
+            curl -sSL \
+              "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/gh_${GH_CLI_VERSION}_linux_amd64.tar.gz" \
+              -o /tmp/gh.tgz
+            tar -xzf /tmp/gh.tgz -C /tmp
+            cp "/tmp/gh_${GH_CLI_VERSION}_linux_amd64/bin/gh" "${GITHUB_WORKSPACE}/.bin/gh"
+            echo "${GITHUB_WORKSPACE}/.bin" >> "${GITHUB_PATH}"
+            "${GITHUB_WORKSPACE}/.bin/gh" --version
+          fi
+
+      - name: Verify jq present (assert, do not bootstrap)
+        run: |
+          set -euo pipefail
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "::error::jq is missing on the runner (ubuntu-latest provides it by default)."
+            exit 1
+          fi
+          jq --version
+
+      - name: Run postCreate.sh (installs gh aw + sanity check)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .devcontainer/postCreate.sh
+
+      - name: Verify gh aw version pin matches VERSIONS.md §1
+        run: |
+          set -euo pipefail
+          installed_ver="$(gh aw version 2>&1 | head -n1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || true)"
+          expected_ver="${GH_AW_VERSION}"
+          echo "expected:  ${expected_ver}"
+          echo "installed: ${installed_ver}"
+          if [ "${installed_ver}" != "${expected_ver}" ]; then
+            echo "::error::gh aw version mismatch (expected ${expected_ver}, got ${installed_ver})"
+            exit 1
+          fi
+          echo "✅ L1 Smoke PASS"

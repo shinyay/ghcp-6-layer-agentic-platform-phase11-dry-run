@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security vulnerability
+    url: https://github.com/shinyay/ghcp-6-layer-agentic-platform/security/advisories/new
+    about: 脆弱性報告は private vulnerability reporting 経由で。詳細は SECURITY.md を参照
+  - name: 📚 GitHub Copilot 公式ドキュメント
+    url: https://docs.github.com/copilot
+    about: Copilot 製品自体の質問は GitHub Docs / Community を参照
