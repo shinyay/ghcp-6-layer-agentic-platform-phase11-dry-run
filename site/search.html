@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Search — Build Your Agentic Platform with GitHub Copilot</title>
+  <meta name="description" content="Search workshop content" />
+  <meta name="theme-color" content="#0d1117" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    /* === Search page styles === */
+    .search-header {
+      padding: 48px 24px 32px;
+    }
+    .search-header h1 {
+      font-size: clamp(24px, 3vw, 36px);
+      font-weight: 700;
+      margin: 0 0 24px;
+      letter-spacing: -0.02em;
+    }
+    .search-bar {
+      display: flex;
+      gap: 8px;
+      max-width: 640px;
+    }
+    .search-input {
+      flex: 1;
+      appearance: none;
+      background: var(--bg-elev-1);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      font: 15px var(--font-sans);
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.18);
+    }
+    .search-btn {
+      appearance: none;
+      background: var(--accent);
+      color: #fff;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-sm);
+      padding: 10px 20px;
+      font: 600 14px var(--font-sans);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .search-btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+    /* === Results area === */
+    .results-section {
+      padding: 0 24px 80px;
+    }
+    .results-meta {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+    .result-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 800px;
+    }
+    .result-item {
+      background: var(--bg-elev-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      transition: border-color 0.15s ease;
+    }
+    .result-item:hover { border-color: var(--accent); }
+    .result-item h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .result-item h3 a { color: var(--accent); }
+    .result-item h3 a:hover { color: var(--accent-hover); }
+    .result-item p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .result-path {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-subtle);
+      margin-bottom: 6px;
+    }
+    mark {
+      background: rgba(47, 129, 247, 0.22);
+      color: var(--text);
+      border-radius: 2px;
+      padding: 0 1px;
+    }
+
+    /* === Pagination === */
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 40px;
+      max-width: 800px;
+    }
+    .page-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 36px;
+      height: 36px;
+      padding: 0 12px;
+      font: 14px var(--font-sans);
+      color: var(--text-muted);
+      background: var(--bg-elev-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+    .page-btn:hover { background: var(--bg-elev-2); border-color: var(--accent); color: var(--accent); text-decoration: none; }
+    .page-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .page-btn[aria-disabled="true"] {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .page-ellipsis {
+      color: var(--text-subtle);
+      padding: 0 4px;
+    }
+    .no-results {
+      color: var(--text-muted);
+      font-size: 15px;
+      padding: 40px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="./" aria-label="Workshop home">
+        <svg class="brand-mark" viewBox="0 0 16 16" width="28" height="28" aria-hidden="true">
+          <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8a8.013 8.013 0 0 0 5.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+        </svg>
+        <span class="brand-text">ghcp-6-layer-agentic-platform</span>
+      </a>
+      <span class="status-pill" aria-label="Site status">
+        <span class="status-dot"></span>
+        Under Construction
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <section class="search-header container">
+      <h1>Search</h1>
+      <form class="search-bar" id="search-form" role="search" aria-label="Site search">
+        <input
+          class="search-input"
+          type="search"
+          id="search-input"
+          name="q"
+          placeholder="Search workshop content…"
+          aria-label="Search query"
+          autocomplete="off"
+        />
+        <button class="search-btn" type="submit">Search</button>
+      </form>
+    </section>
+
+    <section class="results-section container" id="results-section" aria-live="polite" aria-label="Search results">
+      <!-- Populated by JavaScript -->
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 shinyay · Built with <a href="https://github.com/features/copilot" rel="noopener">GitHub Copilot CLI</a></p>
+      <p class="footer-meta">Theme inspired by <a href="https://primer.style/" rel="noopener">GitHub Primer</a></p>
+    </div>
+  </footer>
+
+  <script>
+    // -------------------------------------------------------------------------
+    // Static content index — all searchable pages
+    // -------------------------------------------------------------------------
+    const CONTENT_INDEX = [
+      { title: 'Step 0 — Environment Setup', path: 'content/step-0-setup/', excerpt: 'Configure your Codespaces environment, install prerequisites, and verify all required tools are available before starting the workshop.' },
+      { title: 'Step 1 — Copilot Memory', path: 'content/step-1-memory/', excerpt: 'Use GitHub Copilot Memory to plant repository conventions so that context persists across sessions and chat windows.' },
+      { title: 'Step 2 — Issue Triage Skill', path: 'content/step-2-skill/', excerpt: 'Author a SKILL.md file that teaches Copilot the issue-triage workflow: read body, pick label, write greeting comment.' },
+      { title: 'Step 3 — Three Execution Surfaces', path: 'content/step-3-surfaces/', excerpt: 'Invoke the same skill from IDE Chat, Copilot CLI, and Cloud Agent to observe how publication boundary affects state visibility.' },
+      { title: 'Step 4 — Agentic Workflows', path: 'content/step-4-automate/', excerpt: 'Use gh aw to write Markdown-driven agentic workflows and automate the issue-triage scenario end-to-end.' },
+      { title: 'Step 5 — Multi-Engine Comparison', path: 'content/step-5-multi-engine/', excerpt: 'Run the same triage task with Claude, Codex, and Copilot side-by-side using Agent HQ to compare outputs.' },
+      { title: 'Step 6 — Code Review Gate', path: 'content/step-6-gate/', excerpt: 'Add Copilot Code Review as a Required Check so every PR is gated by both human and AI review before merging.' },
+      { title: 'Prerequisites', path: 'content/prerequisites/', excerpt: 'System requirements, plan requirements (Copilot Pro+ / Business / Enterprise), and tool version checklist for the workshop.' },
+      { title: 'MCP — Model Context Protocol', path: 'content/step-0-setup/#mcp', excerpt: 'MCP provides a unified interface for external tools and data. Configure the GitHub MCP server as Layer 0 of the platform.' },
+      { title: 'SKILL.md Reference', path: 'content/step-2-skill/#skillmd', excerpt: 'Full reference for the SKILL.md front-matter schema: name, description, when-to-use, and workflow steps.' },
+      { title: 'Cloud Agent Trigger', path: 'content/step-3-surfaces/#cloud-agent', excerpt: 'The canonical trigger for Cloud Agent is adding Copilot to Issue Assignees, not mentioning @copilot in the body.' },
+      { title: 'Verified Signed Commits', path: 'content/step-3-surfaces/#trust-thread', excerpt: 'Cloud Agent commits arrive as Verified Signed Commits, providing cryptographic proof of who authored the code.' },
+      { title: 'Publication Boundary', path: 'content/step-3-surfaces/#publication-boundary', excerpt: 'The publication boundary is the point at which a skill becomes visible to Cloud Agent, other users, and Actions.' },
+      { title: 'suggestedActors GraphQL API', path: 'content/step-3-surfaces/#suggested-actors', excerpt: 'Use the suggestedActors GraphQL query to list all bots that can be assigned to an issue, enabling multi-engine workflows.' },
+      { title: 'gh aw — Agentic Workflow CLI', path: 'content/step-4-automate/#gh-aw', excerpt: 'gh aw lets you define agent workflows in Markdown, compose tool calls, and run safe-outputs with approval gates.' },
+      { title: 'copilot-setup-steps.yml', path: 'content/step-4-automate/#setup-steps', excerpt: 'When Cloud Agent cannot reach external APIs, it proposes a copilot-setup-steps.yml workflow file via PR.' },
+      { title: 'Agent HQ', path: 'content/step-5-multi-engine/#agent-hq', excerpt: 'Agent HQ is the unified hub for running Claude, Codex, and Copilot on the same task under one roof.' },
+      { title: 'Required Check Setup', path: 'content/step-6-gate/#required-check', excerpt: 'Configure branch protection rules to make Copilot Code Review a required status check on the default branch.' },
+      { title: 'code-reviewer.agent.md', path: 'content/step-6-gate/#agent-md', excerpt: 'The code-reviewer.agent.md file defines the review criteria and output format for the automated code review agent.' },
+      { title: 'Zero-Trust Design', path: 'content/step-6-gate/#zero-trust', excerpt: 'Every agent action that modifies code goes through a human-gated PR, implementing a zero-trust agentic pipeline.' },
+      { title: 'Workshop Overview', path: './', excerpt: 'Build a 6-layer Agentic Platform step by step using GitHub Copilot, starting from a single SKILL.md file.' },
+      { title: 'Layer 0 — Protocol (MCP)', path: './#layer-0', excerpt: 'MCP provides the unified external-tool interface at the base of the stack.' },
+      { title: 'Layer 1 — Memory', path: './#layer-1', excerpt: 'Copilot Memory enables cross-repository context sharing so conventions persist across sessions.' },
+      { title: 'Layer 2 — Customizations', path: './#layer-2', excerpt: 'Skills, AGENTS.md, and *.agent.md files define agent behavior in a single file per concern.' },
+      { title: 'Layer 3 — Execution Surfaces', path: './#layer-3', excerpt: 'Cloud, CLI, and IDE surfaces all invoke the same skill, providing uniform behavior across environments.' },
+      { title: 'Layer 4 — Agentic Workflows', path: './#layer-4', excerpt: 'gh aw lets you compose agentic workflows in Markdown with safe-outputs and approval checkpoints.' },
+      { title: 'Layer 5 — Multi-Engine', path: './#layer-5', excerpt: 'Agent HQ enables side-by-side comparison of Claude, Codex, and Copilot on the same triage scenario.' },
+      { title: 'Layer 6 — Code Review Gate', path: './#layer-6', excerpt: 'Copilot Code Review as a Required Check means the human is always the final approver.' },
+      { title: 'Release Notes v1.0.0', path: 'RELEASE_NOTES.md', excerpt: 'Initial public release of the 6-Layer Agentic Platform workshop. All 7 steps complete and dogfooding-verified.' },
+      { title: 'Contributing Guide', path: 'CONTRIBUTING.md', excerpt: 'How to submit issues, propose changes, and follow the coding conventions for this workshop repository.' },
+    ];
+
+    const PAGE_SIZE = 5;
+
+    // -------------------------------------------------------------------------
+    // Read URL params
+    // -------------------------------------------------------------------------
+    function getParams() {
+      const params = new URLSearchParams(window.location.search);
+      const query = (params.get('q') || '').trim();
+      const page  = Math.max(1, parseInt(params.get('page') || '1', 10));
+      return { query, page };
+    }
+
+    // -------------------------------------------------------------------------
+    // Simple relevance search
+    // -------------------------------------------------------------------------
+    function search(query) {
+      if (!query) return [];
+      const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+      return CONTENT_INDEX
+        .map((item) => {
+          const haystack = (item.title + ' ' + item.excerpt + ' ' + item.path).toLowerCase();
+          const score = terms.reduce((s, t) => s + (haystack.split(t).length - 1), 0);
+          return { ...item, score };
+        })
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score);
+    }
+
+    // -------------------------------------------------------------------------
+    // Highlight matched terms in text
+    // -------------------------------------------------------------------------
+    function highlight(text, terms) {
+      if (!terms.length) return escapeHtml(text);
+      const pattern = terms.map(escapeRegex).join('|');
+      const re = new RegExp(`(${pattern})`, 'gi');
+      return escapeHtml(text).replace(re, '<mark>$1</mark>');
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeRegex(str) {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // -------------------------------------------------------------------------
+    // Build pagination URL — always derived from current query + target page
+    // -------------------------------------------------------------------------
+    function pageUrl(query, targetPage) {
+      const params = new URLSearchParams();
+      if (query) params.set('q', query);
+      params.set('page', String(targetPage));
+      return '?' + params.toString();
+    }
+
+    // -------------------------------------------------------------------------
+    // Render
+    // -------------------------------------------------------------------------
+    function render() {
+      const { query, page } = getParams();
+      const section = document.getElementById('results-section');
+
+      // Keep the search bar in sync with the URL
+      const input = document.getElementById('search-input');
+      if (input) input.value = query;
+
+      if (!query) {
+        section.innerHTML = '<p class="no-results">Enter a search term above to find workshop content.</p>';
+        return;
+      }
+
+      const allResults = search(query);
+      const totalPages = Math.max(1, Math.ceil(allResults.length / PAGE_SIZE));
+      // Clamp current page to valid range
+      const currentPage = Math.min(page, totalPages);
+      const startIdx = (currentPage - 1) * PAGE_SIZE;
+      const pageResults = allResults.slice(startIdx, startIdx + PAGE_SIZE);
+      const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+
+      let html = '';
+
+      // Results count
+      html += `<p class="results-meta">${allResults.length} result${allResults.length !== 1 ? 's' : ''} for <strong>${escapeHtml(query)}</strong> — page ${currentPage} of ${totalPages}</p>`;
+
+      if (allResults.length === 0) {
+        html += `<p class="no-results">No results found for <strong>${escapeHtml(query)}</strong>. Try different keywords.</p>`;
+        section.innerHTML = html;
+        return;
+      }
+
+      // Result list
+      html += '<ul class="result-list">';
+      for (const item of pageResults) {
+        html += `
+          <li class="result-item">
+            <h3><a href="${escapeHtml(item.path)}">${highlight(item.title, terms)}</a></h3>
+            <span class="result-path">${escapeHtml(item.path)}</span>
+            <p>${highlight(item.excerpt, terms)}</p>
+          </li>`;
+      }
+      html += '</ul>';
+
+      // -----------------------------------------------------------------------
+      // Pagination
+      // The key fix: nextPage is computed from currentPage + 1, never hardcoded.
+      // -----------------------------------------------------------------------
+      const prevPage = currentPage - 1;
+      const nextPage = currentPage + 1;
+
+      html += '<nav class="pagination" aria-label="Pagination">';
+
+      // Previous button
+      if (currentPage > 1) {
+        html += `<a class="page-btn" href="${pageUrl(query, prevPage)}" aria-label="Previous page">&#8592; Prev</a>`;
+      } else {
+        html += `<span class="page-btn" aria-disabled="true">&#8592; Prev</span>`;
+      }
+
+      // Page number buttons (show window of ±2 around current page)
+      const windowStart = Math.max(1, currentPage - 2);
+      const windowEnd   = Math.min(totalPages, currentPage + 2);
+
+      if (windowStart > 1) {
+        html += `<a class="page-btn" href="${pageUrl(query, 1)}" aria-label="Page 1">1</a>`;
+        if (windowStart > 2) html += `<span class="page-ellipsis" aria-hidden="true">…</span>`;
+      }
+
+      for (let p = windowStart; p <= windowEnd; p++) {
+        if (p === currentPage) {
+          html += `<span class="page-btn active" aria-current="page" aria-label="Page ${p}">${p}</span>`;
+        } else {
+          html += `<a class="page-btn" href="${pageUrl(query, p)}" aria-label="Page ${p}">${p}</a>`;
+        }
+      }
+
+      if (windowEnd < totalPages) {
+        if (windowEnd < totalPages - 1) html += `<span class="page-ellipsis" aria-hidden="true">…</span>`;
+        html += `<a class="page-btn" href="${pageUrl(query, totalPages)}" aria-label="Page ${totalPages}">${totalPages}</a>`;
+      }
+
+      // Next button
+      if (currentPage < totalPages) {
+        html += `<a class="page-btn" href="${pageUrl(query, nextPage)}" aria-label="Next page">Next &#8594;</a>`;
+      } else {
+        html += `<span class="page-btn" aria-disabled="true">Next &#8594;</span>`;
+      }
+
+      html += '</nav>';
+
+      section.innerHTML = html;
+    }
+
+    // -------------------------------------------------------------------------
+    // Handle form submission — update URL and re-render
+    // -------------------------------------------------------------------------
+    document.getElementById('search-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const q = document.getElementById('search-input').value.trim();
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      params.set('page', '1');
+      window.history.pushState({}, '', '?' + params.toString());
+      render();
+    });
+
+    // Handle browser back/forward navigation
+    window.addEventListener('popstate', render);
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>
